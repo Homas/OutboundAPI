@@ -1,1 +1,1 @@
-Qualys integration templates
+# Qualys integration templates
