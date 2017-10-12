@@ -1,0 +1,1 @@
+# ForeScout CounterACT integration templates
