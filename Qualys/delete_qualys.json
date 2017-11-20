@@ -1,0 +1,108 @@
+{
+    "version": "1.0",
+    "name": "Delete an asset group",
+    "comment": "Will delete an asset group matching the specified network",
+    "type": "REST_EVENT",
+    "event_type": [
+        "NETWORK_IPV4"
+    ],
+    "action_type": "Delete an asset group based on network changes",
+    "content_type": "text/xml",
+    "vendor_identifier": "Qualys 2.0",
+    "transport": {
+        "path": "/api/2.0/fo",
+        "override_path": true
+    },
+    "quoting": "XML",
+    "steps":
+    [
+        {
+            "name": "stop if it is not a network delete",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${E:A:operation_type}",
+                        "op": "!=",
+                        "right": "DELETE"
+                    }
+                ],
+                "stop": true
+            }
+        },
+        {
+            "name": "Get the asset group id",
+            "operation": "POST",
+            "transport": {
+                "path": "/asset/group/"
+            },
+            "headers": {
+                "X-Requested-With": "BloxTestIntegration"
+            },
+            "parameters": [
+                {
+                    "name": "action",
+                    "value": "list"
+                },
+                {
+                    "name": "title",
+                    "value": "Asset%20group%20for%20network%20${E:A:values{network}}"
+                }
+            ],
+            "parse": "XML"
+        },
+        {
+            "name": "stop if it is not found or if it's not unique",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${P:A:ASSET_GROUP_LIST_OUTPUT{RESPONSE}{ASSET_GROUP_LIST}{ASSET_GROUP}{ID}}",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "error": true,
+                "else_eval": "${XC:COPY:{L:ID}:{P:ASSET_GROUP_LIST_OUTPUT{RESPONSE}{ASSET_GROUP_LIST}{ASSET_GROUP}{ID}}}"
+            }
+        },
+        {
+            "name": "delete the asset group",
+            "operation": "POST",
+            "transport": {
+                "path": "/asset/group/"
+            },
+            "headers": {
+                "X-Requested-With": "BloxTestIntegration"
+            },
+            "parameters": [
+                {
+                    "name": "action",
+                    "value": "delete"
+                },
+                {
+                    "name": "id",
+                    "value": "${L::ID}"
+                }
+            ],
+            "parse": "XML"
+        },
+        {
+            "name": "errorcheck: delete asset group",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${P:A:SIMPLE_RETURN{RESPONSE}{TEXT}}",
+                        "op": "!=",
+                        "right": "Asset Group Deleted Successfully"
+                    }
+                ],
+                "error": true
+            }
+        }
+    ]
+}

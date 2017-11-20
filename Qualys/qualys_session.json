@@ -1,0 +1,12 @@
+{
+    "version": "1.0",
+    "vendor_identifier": "Qualys 2.0",
+    "name": "Qualys2.0 minimal",
+    "type": "REST_ENDPOINT",
+    "comment": "Qualys endpoint",
+    "path": "/api/2.0/fo",
+    "override_path": true,
+    "timeout": 5,
+    "retry": 0,
+    "retry_template": 0
+}

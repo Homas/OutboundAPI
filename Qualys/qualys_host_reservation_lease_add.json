@@ -1,0 +1,470 @@
+{
+    "version": "1.0",
+    "name": "Create an asset from Host, Reservation, Lease and start VM scan",
+    "comment": "Create an asset from Host, Reservation, Lease and start VM scan",
+    "type": "REST_EVENT",
+    "event_type": [
+        "LEASE",
+        "FIXED_ADDRESS_IPV4",
+        "HOST_ADDRESS_IPV4"
+    ],
+    "instance_variables": [
+        {"name":"AssetGroup", "type":"STRING"},
+        {"name":"Scanner", "type":"STRING"}
+    ],
+    "action_type": "Create an asset based on IPAM changes",
+    "content_type": "text/xml",
+    "vendor_identifier": "Qualys 2.0",
+    "transport": {
+        "path": "/api/2.0/fo",
+        "override_path": true
+    },
+
+    "headers": {
+        "X-Requested-With": "InfobloxDDIIntegration"
+    },
+
+    "quoting": "XML",
+    "steps":
+    [
+
+        {
+            "name": "debugEventsVars",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{E:}}"
+        },
+
+        {
+            "name": "check event type",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${E:A:values{_ref}}",
+                        "op": "!=",
+                        "right": ""
+                    }
+                ],
+                "next": "checkDBop"
+            }
+        },
+
+        {
+            "name": "checkSyncLease",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${E:A:ip.extattrs{Qualys_Asset_VM}}",
+                        "op": "!=",
+                        "right": "true"
+                    },
+                    {
+                        "left": "${E:A:ip.extattrs{Qualys_Asset_PC}}",
+                        "op": "!=",
+                        "right": "true"
+                    }
+                ],
+                "stop": true
+            }
+        },
+
+
+        {
+            "name": "assignLVarsLease",
+            "operation": "NOP",
+            "body_list": [
+                "${XC:COPY:{L:ipv4addr}:{E:address}}",
+                "${XC:COPY:{L:Qualys_Assets_Group}:{E:ip.extattrs{Qualys_Assets_Group}}}",
+                "${XC:COPY:{L:Qualys_Scanner}:{E:ip.extattrs{Qualys_Scanner}}}",
+                "${XC:COPY:{L:Qualys_Scan_Option}:{E:ip.extattrs{Qualys_Scan_Option}}}",
+                "${XC:COPY:{L:Qualys_Asset_VM}:{E:ip.extattrs{Qualys_Asset_VM}}}",
+                "${XC:COPY:{L:Qualys_Asset_PC}:{E:ip.extattrs{Qualys_Asset_PC}}}",
+                "${XC:COPY:{L:Qualys_Scan}:{E:ip.extattrs{Qualys_Scan_On_Add}}}",
+                "${XC:COPY:{L:Qualys_User_SNMP}:{E:ip.extattrs{Qualys_User_SNMP}}}",
+                "${XC:COPY:{L:Qualys_User_Unix}:{E:ip.extattrs{Qualys_User_Unix}}}",
+                "${XC:ASSIGN:{L:Event}:{S:Lease}}"
+            ]
+        },
+
+        {
+            "name": "gotoQualyslogic",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "next": "initLvars"
+            }
+        },
+
+        {
+            "name": "checkDBop",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${E:A:operation_type}",
+                        "op": "!=",
+                        "right": "INSERT"
+                    }
+                ],
+                "stop": true
+            }
+        },
+
+        {
+            "name": "checkSyncFixedHost",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${E:A:values{extattrs}{Qualys_Asset_VM}{value}}",
+                        "op": "!=",
+                        "right": "true"
+                    },
+                    {
+                        "left": "${E:A:values{extattrs}{Qualys_Asset_PC}{value}}",
+                        "op": "!=",
+                        "right": "true"
+                    }
+                ],
+                "stop": true
+            }
+        },
+
+
+        {
+            "name": "assignLVarsFixedHost",
+            "operation": "NOP",
+            "body_list": [
+                "${XC:COPY:{L:ipv4addr}:{E:values{ipv4addr}}}",
+                "${XC:COPY:{L:Qualys_Assets_Group}:{E:values{extattrs}{Qualys_Assets_Group}{value}}}",
+                "${XC:COPY:{L:Qualys_Scanner}:{E:values{extattrs}{Qualys_Scanner}{value}}}",
+                "${XC:COPY:{L:Qualys_Scan_Option}:{E:values{extattrs}{Qualys_Scan_Option}{value}}}",
+                "${XC:COPY:{L:Qualys_Asset_VM}:{E:values{extattrs}{Qualys_Asset_VM}{value}}}",
+                "${XC:COPY:{L:Qualys_Asset_PC}:{E:values{extattrs}{Qualys_Asset_PC}{value}}}",
+                "${XC:COPY:{L:Qualys_Scan}:{E:values{extattrs}{Qualys_Scan_On_Add}{value}}}",
+                "${XC:COPY:{L:Qualys_User_SNMP}:{E:values{extattrs}{Qualys_User_SNMP}{value}}}",
+                "${XC:COPY:{L:Qualys_User_Unix}:{E:values{extattrs}{Qualys_User_Unix}{value}}}",
+                "${XC:COPY:{L:Event}:{E:object_type}}"
+            ]
+        },
+
+        {
+            "name": "initLvars",
+            "operation": "NOP",
+            "body_list": [
+                "${XC:ASSIGN:{L:Iter}:{I:0}}",
+                "${XC:ASSIGN:{L:MaxIter}:{I:3}}"
+            ]
+        },
+
+        {
+            "name": "Init Qualys_Asset_VM_D",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${L:A:Qualys_Asset_VM}",
+                        "op": "==",
+                        "right": "true"
+                    }
+                ],
+                "eval": "${XC:ASSIGN:{L:Qualys_Asset_VM_D}:{I:1}}",
+                "else_eval": "${XC:ASSIGN:{L:Qualys_Asset_VM_D}:{I:0}}"
+            }
+        },
+
+        {
+            "name": "Init Qualys_Asset_PC_D",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${L:A:Qualys_Asset_PC}",
+                        "op": "==",
+                        "right": "true"
+                    }
+                ],
+                "eval": "${XC:ASSIGN:{L:Qualys_Asset_PC_D}:{I:1}}",
+                "else_eval": "${XC:ASSIGN:{L:Qualys_Asset_PC_D}:{I:0}}"
+            }
+        },
+
+        {
+            "name": "insertAsset",
+            "operation": "POST",
+            "transport": {
+                "path": "/asset/ip/"
+            },
+            "parameters": [
+                {"name": "action","value": "add"},
+                {"name": "ips","value": "${L::ipv4addr}"},
+                {"name": "enable_vm","value": "${L::Qualys_Asset_VM_D}"},
+                {"name": "enable_pc","value": "${L::Qualys_Asset_PC_D}"},
+                {"name": "comment","value": "Created+by+Infoblox+DDI+at+${UT::TIME}+from+${L::Event}"}
+            ],
+            "parse": "XML"
+        },
+
+        {
+            "name": "checkInsertAsset",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${P:A:SIMPLE_RETURN{RESPONSE}{TEXT}}",
+                        "op": "!=",
+                        "right": "IPs successfully added to Vulnerability Management"
+                    },
+                    {
+                        "left": "${P:A:SIMPLE_RETURN{RESPONSE}{TEXT}}",
+                        "op": "!=",
+                        "right": "IPs successfully added to Compliance Management"
+                    },
+                    {
+                        "left": "${P:A:SIMPLE_RETURN{RESPONSE}{TEXT}}",
+                        "op": "!=",
+                        "right": "IPs successfully added to Vulnerability Management/Compliance Management"
+                    }
+                ],
+                "error": true
+            }
+        },
+
+        {
+            "name": "checkGroupSet",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${L::Qualys_Assets_Group}",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "next": "checkSNMPAuth"
+            }
+        },
+
+        {
+            "name": "look for an asset group ID",
+            "operation": "POST",
+            "transport": {
+                "path": "/asset/group/"
+            },
+            "parameters": [
+                {"name": "action","value": "list"},
+                {"name": "title","value": "${L::Qualys_Assets_Group}"}
+            ],
+            "parse": "XML"
+        },
+
+
+        {
+            "name": "checkGroupID",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${P::ASSET_GROUP_LIST_OUTPUT{RESPONSE}{ASSET_GROUP_LIST}{ASSET_GROUP}{ID}}",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "next": "checkSNMPAuth"
+            }
+        },
+
+        {
+            "name": "add the asset to a group",
+            "operation": "POST",
+            "transport": {
+                "path": "/asset/group/"
+            },
+            "parameters": [
+                {"name": "action","value": "edit"},
+                {"name": "id","value": "${P::ASSET_GROUP_LIST_OUTPUT{RESPONSE}{ASSET_GROUP_LIST}{ASSET_GROUP}{ID}}"},
+                {"name": "add_ips","value": "${L::ipv4addr}"}
+            ],
+            "parse": "XML"
+        },
+
+
+        {
+            "name": "checkSNMPAuth",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${L::Qualys_User_SNMP}",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "next": "checkUnixAuth"
+            }
+        },
+
+        {
+            "name": "look for a snmp auth ID",
+            "operation": "POST",
+            "transport": {
+                "path": "/auth/snmp/"
+            },
+            "parameters": [
+                {"name": "action","value": "list"},
+                {"name": "title","value": "${L::Qualys_User_SNMP}"}
+            ],
+            "parse": "XML"
+        },
+        {
+            "name": "add the asset to a snmp",
+            "operation": "POST",
+            "transport": {
+                "path": "/auth/snmp/"
+            },
+            "parameters": [
+                {"name": "action","value": "update"},
+                {"name": "ids","value": "${P::AUTH_SNMP_LIST_OUTPUT{RESPONSE}{AUTH_SNMP_LIST}{AUTH_SNMP}{ID}}"},
+                {"name": "add_ips","value": "${L::ipv4addr}"}
+            ],
+            "parse": "XML"
+        },
+
+        {
+            "name": "checkUnixAuth",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${L::Qualys_User_Unix}",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "next": "look for a Unix auth ID"
+            }
+        },
+
+        {
+            "name": "look for a Unix auth ID",
+            "operation": "POST",
+            "transport": {
+                "path": "/auth/unix/"
+            },
+            "parameters": [
+                {"name": "action","value": "list"},
+                {"name": "title","value": "${L::Qualys_User_Unix}"}
+            ],
+            "parse": "XML"
+        },
+        {
+            "name": "add the asset to a Unix",
+            "operation": "POST",
+            "transport": {
+                "path": "/auth/unix/"
+            },
+            "parameters": [
+                {"name": "action","value": "update"},
+                {"name": "ids","value": "${P::AUTH_UNIX_LIST_OUTPUT{RESPONSE}{AUTH_UNIX_LIST}{AUTH_UNIX}{ID}}"},
+                {"name": "add_ips","value": "${L::ipv4addr}"}
+            ],
+            "parse": "XML"
+        },
+
+
+
+        {
+            "name": "checkScanVM",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "OR",
+                "statements": [
+                    {
+                        "left": "${L::Qualys_Scan}",
+                        "op": "==",
+                        "right": ""
+                    },
+                    {
+                        "left": "${L::Qualys_Scan}",
+                        "op": "==",
+                        "right": "false"
+                    },
+                    {
+                        "left": "${L::Qualys_Scanner}",
+                        "op": "==",
+                        "right": ""
+                    },
+                    {
+                        "left": "${L::Qualys_Scan_Option}",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "next": "END"
+            }
+        },
+
+        {
+            "name": "VMScanSleep1",
+            "operation": "SLEEP",
+            "timeout": "120"
+        },
+
+        {
+            "name": "launchVMscan",
+            "operation": "POST",
+            "transport": {
+                "path": "/scan/"
+            },
+            "parameters": [
+                {"name": "action","value": "launch"},
+                {"name": "scan_title","value": "${L::ipv4addr}+scan+initiaded+by+Infoblox+at+${UT::TIME}"},
+                {"name": "ip","value": "${L::ipv4addr}"},
+                {"name": "iscanner_name","value": "${L::Qualys_Scanner}"},
+                {"name": "option_title","value": "${L:U:Qualys_Scan_Option}"}
+            ],
+            "parse": "XML"
+        },
+
+        {
+            "name": "checkScanStart",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "OR",
+                "statements": [
+                    {
+                        "left": "${P::SIMPLE_RETURN{RESPONSE}{CODE}}",
+                        "op": "!=",
+                        "right": "1904"
+                    }
+                ],
+                "next": "END"
+            }
+        },
+
+
+        {
+            "name": "END",
+            "operation": "NOP"
+        }
+    ]
+}

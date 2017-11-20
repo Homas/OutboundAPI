@@ -1,0 +1,262 @@
+{
+    "version": "1.0",
+    "name": "Scan an asset on DNS FW hit",
+    "comment": "Scan an asset on DNS FW hit",
+    "type": "REST_EVENT",
+    "event_type": [
+        "RPZ",
+        "TUNNEL"
+    ],
+    "action_type": "Scan an asset based on DNS FW Hit",
+    "content_type": "text/xml",
+    "vendor_identifier": "Qualys 2.0",
+    "transport": {
+        "path": "/api/2.0/fo",
+        "override_path": true
+    },
+
+    "headers": {
+        "X-Requested-With": "InfobloxDDIIntegration"
+    },
+
+    "quoting": "XML",
+    "steps":
+    [
+
+        {
+            "name": "debugEventsVars",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{E:}}"
+        },
+
+        {
+            "name": "checkIPEAs",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "OR",
+                "statements": [
+                    {
+                        "left": "${E::ip.extattrs{Qualys_Scan}}",
+                        "op": "==",
+                        "right": ""
+                    },
+                    {
+                        "left": "${E::ip.extattrs{Qualys_Scanner}}",
+                        "op": "==",
+                        "right": ""
+                    },
+                    {
+                        "left": "${E::ip.extattrs{Qualys_Scan_Option}}",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "next": "checkNetEAs"
+            }
+        },
+
+
+        {
+            "name": "setLIPVars",
+            "operation": "NOP",
+            "body_list": [
+                "${XC:COPY:{L:source_ip}:{E:source_ip}}",
+                "${XC:COPY:{L:Qualys_Scanner}:{E:ip.extattrs{Qualys_Scanner}}}",
+                "${XC:COPY:{L:Qualys_Scan_Option}:{E:ip.extattrs{Qualys_Scan_Option}}}",
+                "${XC:COPY:{L:Qualys_Scan}:{E:ip.extattrs{Qualys_Scan}}}",
+                "${XC:ASSIGN:{L:EndPointType}:{S:Lease}}"
+            ]
+        },
+
+        {
+            "name": "goToDNSFWorAnalytics",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "OR",
+                "statements": [
+                    {
+                        "left": "",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "next": "performScanCheck"
+            }
+        },
+
+        {
+            "name": "checkNetEAs",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "OR",
+                "statements": [
+                    {
+                        "left": "${E::network.extattrs{Qualys_Scan}}",
+                        "op": "==",
+                        "right": ""
+                    },
+                    {
+                        "left": "${E::network.extattrs{Qualys_Scanner}}",
+                        "op": "==",
+                        "right": ""
+                    },
+                    {
+                        "left": "${E::network.extattrs{Qualys_Scan_Option}}",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "stop": true
+            }
+        },
+
+        {
+            "name": "setLNetVars",
+            "operation": "NOP",
+            "body_list": [
+                "${XC:COPY:{L:source_ip}:{E:source_ip}}",
+                "${XC:COPY:{L:Qualys_Scanner}:{E:network.extattrs{Qualys_Scanner}}}",
+                "${XC:COPY:{L:Qualys_Scan_Option}:{E:network.extattrs{Qualys_Scan_Option}}}",
+                "${XC:COPY:{L:Qualys_Scan}:{E:network.extattrs{Qualys_Scan}}}",
+                "${XC:ASSIGN:{L:EndPointType}:{S:Unknown}}"
+            ]
+        },
+
+
+        {
+            "name": "performScanCheck",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${L::Qualys_Scan}",
+                        "op": "==",
+                        "right": "false"
+                    }
+                ],
+                "stop": true
+            }
+        },
+
+        {
+            "name": "DNSFWorAnalytics",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "OR",
+                "statements": [
+                    {
+                        "left": "${E::query_name}",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "eval": "${XC:ASSIGN:{L:EventType}:{S:DNS Tunneling}}",
+                "else_eval": "${XC:ASSIGN:{L:EventType}:{S:DNS Firewall hit}}"
+            }
+        },
+
+
+        {
+            "name": "DNSFWorAnalytics1",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "OR",
+                "statements": [
+                    {
+                        "left": "${E::query_name}",
+                        "op": "!=",
+                        "right": ""
+                    }
+                ],
+                "eval": "${XC:COPY:{L:BlockedDomain}:{E:query_name}",
+                "else_eval": "${XC:COPY:{L:BlockedDomain}:{E:domain_name}}"
+            }
+        },
+
+        {
+            "name": "DNSFWorAnalytics2",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "OR",
+                "statements": [
+                    {
+                        "left": "${E::query_name}",
+                        "op": "!=",
+                        "right": ""
+                    }
+                ],
+                "eval": "${XC:COPY:{L:RPZRule}:{E:rule_name}",
+                "else_eval": "${XC:ASSIGN:{L:RPZRule}:{S: }}"
+            }
+        },
+
+        {
+            "name": "checkIfScanRunning",
+            "operation": "POST",
+            "transport": {
+                "path": "/scan/"
+            },
+            "parameters": [
+                {"name": "action","value": "list"},
+                {"name": "target","value": "${E:A:source_ip}"},
+                {"name": "state","value": "Running,Queued"}
+            ],
+            "parse": "XML"
+        },
+
+        {
+            "name": "checkScanRunning",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${P::SCAN_LIST_OUTPUT{RESPONSE}{SCAN_LIST}{SCAN}{REF}}",
+                        "op": "!=",
+                        "right": ""
+                    }
+                ],
+                "next": "END"
+            }
+        },
+
+
+        {
+            "name": "launchVMscan",
+            "operation": "POST",
+            "transport": {
+                "path": "/scan/"
+            },
+            "parameters": [
+                {"name": "action","value": "launch"},
+                {"name": "scan_title","value": "${L:A:source_ip}+scan+initiated+by+Infoblox+at+${UT::TIME}+by+a+${L:U:EventType}.+Domain:+${L:U:BlockedDomain}.+RPZ+Rule+${L:U:RPZRule}."},
+                {"name": "ip","value": "${L:A:source_ip}"},
+                {"name": "iscanner_name","value": "${L:U:Qualys_Scanner}"},
+                {"name": "option_title","value": "${L:U:Qualys_Scan_Option}"}
+            ],
+            "parse": "XML"
+        },
+
+        {
+            "name": "checkScanStart",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "OR",
+                "statements": [
+                    {
+                        "left": "${P::SIMPLE_RETURN{RESPONSE}{CODE}}",
+                        "op": "==",
+                        "right": "1904"
+                    }
+                ],
+                "error": true
+            }
+        },
+
+        {
+            "name": "END",
+            "operation": "NOP"
+        }
+    ]
+}

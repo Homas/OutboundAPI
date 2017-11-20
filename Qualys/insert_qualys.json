@@ -1,0 +1,79 @@
+{
+    "version": "1.0",
+    "name": "Create asset group from network",
+    "comment": "Will insert an asset group with the WAPI reference in the comments",
+    "type": "REST_EVENT",
+    "event_type": [
+        "NETWORK_IPV4"
+    ],
+    "action_type": "Create an asset group based on network changes",
+    "content_type": "text/xml",
+    "vendor_identifier": "Qualys 2.0",
+    "transport": {
+        "path": "/api/2.0/fo",
+        "override_path": true
+    },
+    "quoting": "XML",
+    "steps":
+    [
+        {
+            "name": "stop if it is not a network insert",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${E:A:operation_type}",
+                        "op": "!=",
+                        "right": "INSERT"
+                    }
+                ],
+                "stop": true
+            }
+        },
+        {
+            "name": "insert asset group",
+            "operation": "POST",
+            "transport": {
+                "path": "/asset/group/"
+            },
+            "headers": {
+                "X-Requested-With": "BloxTestIntegration"
+            },
+            "parameters": [
+                {
+                    "name": "action",
+                    "value": "add"
+                },
+                {
+                    "name": "title",
+                    "value": "Asset%20group%20for%20network%20${E:A:values{network}}"
+                },
+                {
+                    "name": "comments",
+                    "value": "WAPI%20reference%20${E:A:values{_ref}}"
+                },
+                {
+                    "name": "ips",
+                    "value": "${E::values{network}}"
+                }
+            ],
+            "parse": "XML"
+        },
+        {
+            "name": "errorcheck: insert asset group",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${P:A:SIMPLE_RETURN{RESPONSE}{TEXT}}",
+                        "op": "!=",
+                        "right": "Asset Group successfully added."
+                    }
+                ],
+                "error": true
+            }
+        }
+    ]
+}
