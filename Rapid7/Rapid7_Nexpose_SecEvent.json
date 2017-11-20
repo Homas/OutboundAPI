@@ -1,0 +1,509 @@
+{
+  "version": "2.0",
+  "name": "Rapid7 Nexpose Scan assets by a security event",
+  "comment": "",
+  "type": "REST_EVENT",
+  "event_type": [
+    "RPZ",
+    "TUNNEL"
+  ],
+  "action_type": "Rapid7 Nexpose Scan assets by security event",
+  "content_type": "text/xml",
+  "vendor_identifier": "Rapid7",
+  "quoting": "XMLA",
+  "steps":
+  [
+
+    {
+      "name": "checkIPEAs",
+      "operation": "CONDITION",
+      "condition": {
+          "condition_type": "AND",
+          "statements": [
+              {"left": "${E::ip.extattrs{R7_ScanOnEvent}}", "op": "==", "right": ""}
+          ],
+          "next": "checkNetEAs"
+      }
+    },
+
+    {
+      "name": "checkIPScanOnEvent",
+      "operation": "CONDITION",
+      "condition": {
+          "condition_type": "OR",
+          "statements": [
+              {"left": "${E::ip.extattrs{R7_Site}}", "op": "==", "right": ""},
+              {"left": "${E::ip.extattrs{R7_ScanOnEvent}}", "op": "==", "right": "false"}
+          ],
+          "stop": true
+      }
+    },
+
+    {
+      "name": "setLIPVars",
+      "operation": "NOP",
+      "body_list": [
+        "${XC:COPY:{L:source_ip}:{E:source_ip}}",
+        "${XC:ASSIGN:{L:EASource}:{S:IP}}",
+        "${XC:COPY:{L:Hostname}:{E:ip.names[0]}}",
+        "${XC:ASSIGN:{L:SaveEA}:{S:false}}",
+        "${XC:COPY:{L:Site}:{E:ip.extattrs{R7_Site}}}"
+      ]
+    },
+
+    {
+      "name": "setIPSiteID",
+      "operation": "CONDITION",
+      "condition": {
+          "condition_type": "OR",
+          "statements": [
+              {"left": "${E::ip.extattrs{R7_SiteID}}", "op": "==", "right": ""}
+          ],
+          "eval": "${XC:ASSIGN:{L:SiteID}:{I:0}}${XC:ASSIGN:{L:LastScan}:{S:}}",
+          "else_eval": "${XC:COPY:{L:SiteID}:{E:ip.extattrs{R7_SiteID}}}"
+      }
+    },
+
+    {
+      "name": "setIPLastScan",
+      "operation": "CONDITION",
+      "condition": {
+          "condition_type": "OR",
+          "statements": [
+              {"left": "${E::ip.extattrs{R7_LastScan}}", "op": "==", "right": ""}
+          ],
+          "eval": "${XC:ASSIGN:{L:LastScan}:{S:}}",
+          "else_eval": "${XC:COPY:{L:LastScan}:{E:ip.extattrs{R7_LastScan}}}"
+      }
+    },
+
+    {
+      "name": "setIPScanTemplate",
+      "operation": "CONDITION",
+      "condition": {
+          "condition_type": "OR",
+          "statements": [
+              {"left": "${E::ip.extattrs{R7_ScanTemplate}}", "op": "==", "right": ""}
+          ],
+          "eval": "${XC:ASSIGN:{L:ScanTemplate}:{S:default}}",
+          "else_eval": "${XC:COPY:{L:ScanTemplate}:{E:ip.extattrs{R7_ScanTemplate}}}"
+      }
+    },
+
+
+    {
+      "name": "setIPAddByHostname",
+      "operation": "CONDITION",
+      "condition": {
+          "condition_type": "OR",
+          "statements": [
+              {"left": "${E::ip.extattrs{R7_AddByHostname}}", "op": "==", "right": ""}
+          ],
+          "eval": "${XC:ASSIGN:{L:AddByHostname}:{S:false}}",
+          "else_eval": "${XC:COPY:{L:AddByHostname}:{E:ip.extattrs{R7_AddByHostname}}}"
+      }
+    },
+
+    {
+      "name": "checkNetView",
+      "operation": "CONDITION",
+      "condition": {
+        "condition_type": "OR",
+        "statements": [
+            {"left": "${E::network.network_view}", "op": "==", "right": ""}
+        ],
+        "next": "assignScanVars",
+        "else_eval": "${XC:COPY:{L:network_view}:{E:network.network_view}}"
+      }
+    },
+
+    {
+       "name": "Get IPv4Fixed _ref",
+       "operation": "GET",
+       "transport": {"path": "fixedaddress?ipv4addr=${L:U:source_ip}&network_view=${L:U:network_view}"},
+       "wapi": "v2.6"
+    },
+
+    {
+       "operation": "CONDITION",
+       "name": "wapi_response_getIPv4Fix_ref",
+       "condition": {
+          "statements": [
+             {"left": "${P:A:PARSE[0]{_ref}}", "op": "!=", "right": ""}
+          ],
+          "condition_type": "AND",
+          "next": "Get_Objref"
+       }
+    },
+
+    {
+       "name": "Get HostIPv4 _ref",
+       "operation": "GET",
+       "transport": {"path": "record:host?ipv4addr=${L:U:source_ip}&network_view=${L:U:network_view}"},
+       "wapi": "v2.6"
+    },
+
+    {
+       "operation": "CONDITION",
+       "name": "wapi_response_getIPv4Host_ref",
+       "condition": {
+          "statements": [
+             {"left": "${P:A:PARSE[0]{_ref}}", "op": "!=", "right": ""}
+          ],
+          "condition_type": "AND",
+          "next": "Get_Objref"
+       }
+    },
+
+
+    {
+       "name": "Get IPv6Fixed _ref",
+       "operation": "GET",
+       "transport": {"path": "ipv6fixedaddress?ipv4addr=${L:U:source_ip}&network_view=${L:U:network_view}"},
+       "wapi": "v2.6"
+    },
+
+    {
+       "operation": "CONDITION",
+       "name": "wapi_response_getIPv6Fix_ref",
+       "condition": {
+          "statements": [
+             {"left": "${P:A:PARSE[0]{_ref}}", "op": "!=", "right": ""}
+          ],
+          "condition_type": "AND",
+          "next": "Get_Objref"
+       }
+    },
+
+    {
+       "name": "Get HostIPv6 _ref",
+       "operation": "GET",
+       "transport": {"path": "record:host?ipv6addr=${L:U:source_ip}&network_view=${L:U:network_view}"},
+       "wapi": "v2.6"
+    },
+
+    {
+       "operation": "CONDITION",
+       "name": "wapi_response_getIPv6Host_ref",
+       "condition": {
+          "statements": [
+             {"left": "${P:A:PARSE[0]{_ref}}", "op": "!=", "right": ""}
+          ],
+          "condition_type": "AND",
+          "next": "Get_Objref"
+       }
+    },
+
+    {
+       "name": "Get_Objref",
+       "operation": "CONDITION",
+       "condition": {
+          "statements": [
+             {"left": "${P:A:PARSE[0]{_ref}}", "op": "!=", "right": ""}
+          ],
+          "condition_type": "AND",
+          "eval": "${XC:COPY:{L:Obj_ref}:{P:PARSE[0]{_ref}}}${XC:ASSIGN:{L:SaveEA}:{S:true}}"
+       }
+    },
+
+    {
+       "name": "CheckIfHost",
+       "operation": "CONDITION",
+       "condition": {
+          "statements": [
+             {"left": "${L::Obj_ref}", "op": "=~", "right": "record:host"}
+          ],
+          "condition_type": "AND",
+          "eval": "${XC:ASSIGN:{L:EASource}:{S:HOST}}"
+       }
+    },
+
+    {
+      "name": "goToSiteIDcheck",
+      "operation": "CONDITION",
+      "condition": {
+        "condition_type": "OR",
+        "statements": [
+            {"left": "", "op": "==", "right": ""}
+        ],
+        "next": "assignScanVars"
+      }
+    },
+
+    {
+      "name": "checkNetEAs",
+      "operation": "CONDITION",
+      "condition": {
+          "condition_type": "OR",
+          "statements": [
+              {"left": "${E::network.extattrs{R7_ScanOnEvent}}", "op": "==", "right": ""},
+              {"left": "${E::network.extattrs{R7_ScanOnEvent}}", "op": "==", "right": "false"}
+          ],
+          "stop": true
+      }
+    },
+
+    {
+      "name": "setLNetVars",
+      "operation": "NOP",
+      "body_list": [
+        "${XC:COPY:{L:source_ip}:{E:source_ip}}",
+        "${XC:COPY:{L:Site}:{E:network.extattrs{R7_Site}}}",
+        "${XC:ASSIGN:{L:LastScan}:{S:}}",
+        "${XC:ASSIGN:{L:EASource}:{S:Net}}",
+        "${XC:ASSIGN:{L:SaveEA}:{S:false}}",
+        "${XC:ASSIGN:{L:Hostname}:{S:}}",
+        "${XC:ASSIGN:{L:AddByHostname}:{S:false}}"
+      ]
+    },
+
+    {
+      "name": "setNetSiteID",
+      "operation": "CONDITION",
+      "condition": {
+          "condition_type": "OR",
+          "statements": [
+              {"left": "${E::network.extattrs{R7_SiteID}}", "op": "==", "right": ""}
+          ],
+          "eval": "${XC:ASSIGN:{L:SiteID}:{I:0}}${XC:ASSIGN:{L:LastScan}:{S:}}",
+          "else_eval": "${XC:COPY:{L:SiteID}:{E:network.extattrs{R7_SiteID}}}"
+      }
+    },
+
+    {
+      "name": "setNetScanTemplate",
+      "operation": "CONDITION",
+      "condition": {
+          "condition_type": "OR",
+          "statements": [
+              {"left": "${E::network.extattrs{R7_ScanTemplate}}", "op": "==", "right": ""}
+          ],
+          "eval": "${XC:ASSIGN:{L:ScanTemplate}:{S:default}}",
+          "else_eval": "${XC:COPY:{L:ScanTemplate}:{E:network.extattrs{R7_ScanTemplate}}}"
+      }
+    },
+
+    {
+        "name": "assignScanVars",
+        "operation": "NOP",
+        "body_list": [
+            "${XC:COPY:{L:ScanDate}:{UT:TIME}}${XC:FORMAT:TRUNCATE:{L:ScanDate}:{10t}}",
+            "${XC:COPY:{L:R7ScanSchTime}:{UT:EPOCH}}${XC:FORMAT:DATE_STRFTIME:{L:R7ScanSchTime}:{%Y%m%dT%H%M59000Z}}"
+         ]
+    },
+
+    {
+      "name": "checkIFScannedToday",
+      "operation": "CONDITION",
+      "condition": {
+          "condition_type": "OR",
+          "statements": [
+              {"left": "${L::LastScan}", "op": "==", "right": "${L::ScanDate}"}
+          ],
+          "stop": true
+      }
+    },
+
+
+    {
+        "name": "Check SiteID",
+        "operation": "CONDITION",
+        "condition": {
+            "condition_type": "AND",
+            "statements": [
+                {"left": "${L:A:SiteID}", "op": "!=", "right": "0"}
+            ],
+            "next": "Create a schedule"
+        }
+    },
+
+
+    {
+       "name": "Request R7 sites",
+       "parse": "XMLA",
+       "operation": "POST",
+       "body_list": [
+          "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+          "<SiteListingRequest session-id=\"${S::SESSID}\" />"
+       ]
+    },
+
+    {
+       "name": "Check sites request on errors",
+       "operation": "CONDITION",
+       "condition": {
+          "statements": [
+             {"left": "${P:A:PARSE[[name]]}", "op": "!=", "right": "SiteListingResponse"},
+             {"left": "${P:A:PARSE{{success}}}", "op": "!=", "right": "1"}
+          ],
+          "condition_type": "AND",
+          "else_eval": "${XC:COPY:{L:site_list}:{P:PARSE}",
+          "error": true
+       }
+    },
+
+    {
+       "name": "Check if sites list is empty",
+       "operation": "CONDITION",
+       "condition": {
+          "statements": [
+             {"left": "${L:L:site_list}", "op": "==", "right": "0"}
+          ],
+          "condition_type": "AND",
+          "stop": true
+       }
+    },
+
+    {
+        "name": "Pop site from the list",
+        "operation": "VARIABLEOP",
+        "variable_ops": [
+           {
+              "operation": "POP",
+              "type": "COMPOSITE",
+              "destination": "L:a_site",
+              "source": "L:site_list"
+          }
+       ]
+    },
+
+    {
+       "name": "check_a_site",
+       "operation": "CONDITION",
+       "condition": {
+          "statements": [
+            {"left": "${L:A:Site}", "op": "!=", "right": "${L:A:a_site{{name}}}"}
+          ],
+          "condition_type": "AND",
+          "next": "Check if sites list is empty",
+          "else_eval": "${XC:COPY:{L:SiteID}:{L:a_site{{id}}}}"
+       }
+    },
+
+    {
+      "name": "checkSaveSiteID",
+      "operation": "CONDITION",
+      "condition": {
+        "condition_type": "AND",
+        "statements": [
+            {"left": "${L::SaveEA}", "op": "!=", "right": "true"}
+        ],
+        "next": "Create a schedule"
+      }
+    },
+
+    {
+       "name": "Update SiteID",
+       "operation": "PUT",
+       "transport": {"path": "${L:A:Obj_ref}"},
+       "wapi": "v2.6",
+       "wapi_quoting": "JSON",
+        "body_list": [
+            "{",
+            "\"extattrs+\":{\"R7_SiteID\": { \"value\": \"${L:A:SiteID}\"}}",
+            "}"
+        ]
+
+    },
+
+    {
+      "name": "Create a schedule",
+      "operation": "SERIALIZE",
+      "serializations": [
+        {"destination": "L:R7ScanSch","content": "<Schedules><AdHocSchedule start=\"${L:A:R7ScanSchTime}\" template=\"${L:A:ScanTemplate}\" /> </Schedules>"},
+        {"destination": "L:R7ScanByHost","content": "<Hosts><host>${L:A:Hostname}</host></Hosts>"},
+        {"destination": "L:R7ScanByIP","content": "<Hosts><range from=\"${L:A:source_ip}\"/></Hosts>"}
+      ]
+    },
+
+
+
+
+    {
+      "name": "scanByHostname",
+      "operation": "CONDITION",
+      "condition": {
+        "condition_type": "AND",
+        "statements": [
+          {"left": "${L::AddByHostname}", "op": "==", "right": "true"},
+          {"left": "${L::Hostname}", "op": "!=", "right": ""},
+          {"left": "${L::EASource}", "op": "==", "right": "HOST"}
+        ],
+        "eval": "${XC:COPY:{L:R7ScanHostsRanges}:{L:R7ScanByHost}}",
+        "else_eval": "${XC:COPY:{L:R7ScanHostsRanges}:{L:R7ScanByIP}}"
+      }
+    },
+    {
+      "name": "skipSchedule",
+      "operation": "CONDITION",
+      "condition": {
+        "condition_type": "OR",
+        "statements": [
+            {"left": "${L::ScanTemplate}", "op": "==", "right": "default"},
+            {"left": "${L::ScanTemplate}", "op": "==", "right": ""}
+        ],
+        "eval": "${XC:ASSIGN:{L:R7ScanSch}:{S:}}"
+      }
+    },
+    {
+      "name": "RequestAssetScan",
+      "parse": "XMLA",
+      "operation": "POST",
+      "body_list": [
+         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+         "<SiteDevicesScanRequest session-id=\"${S::SESSID}\" site-id=\"${L:A:SiteID}\">",
+         "${L:A:R7ScanHostsRanges}",
+         "${L:A:R7ScanSch}",
+         "</SiteDevicesScanRequest>"
+      ]
+    },
+
+    {
+      "name": "scan_site(errorcheck)",
+      "operation": "CONDITION",
+      "condition": {
+        "statements": [
+          {"left": "SiteDevicesScanResponse", "op": "!=", "right": "${P:A:PARSE[[name]]}"},
+          {"left": "${P:A:PARSE{{success}}}", "op": "!=", "right": "1"}
+        ],
+        "condition_type": "OR",
+        "error": true
+      }
+    },
+
+    {
+      "name": "checkSaveLastScan",
+      "operation": "CONDITION",
+      "condition": {
+        "condition_type": "OR",
+        "statements": [
+          {"left": "${L::SaveEA}", "op": "!=", "right": "true"},
+          {"left": "${L::EASource}", "op": "==", "right": "Net"}
+        ],
+        "next": "Fin"
+      }
+    },
+
+
+    {
+       "name": "Update R7_LastScan",
+       "operation": "PUT",
+       "transport": {"path": "${L:A:Obj_ref}"},
+       "wapi": "v2.6",
+       "wapi_quoting": "JSON",
+        "body_list": [
+            "{",
+            "\"extattrs+\":{\"R7_LastScan\": { \"value\": \"${L:U:ScanDate}\"}}",
+            "}"
+        ]
+
+    },
+
+
+    {
+        "name": "Fin",
+        "operation": "NOP",
+        "body": "${XC:DEBUG:{L:}}${XC:DEBUG:{E:}}${XC:DEBUG:{P:}}"
+    }
+  ]
+}
