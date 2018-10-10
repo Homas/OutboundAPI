@@ -1,0 +1,508 @@
+{
+    "name": "Palo Alto Assets 2.1",
+    "comment": "v 0.2",
+    "version": "3.0",
+    "type": "REST_EVENT",
+    "event_type": [
+        "NETWORK_IPV4",
+        "LEASE",
+        "FIXED_ADDRESS_IPV4",
+        "HOST_ADDRESS_IPV4"
+    ],
+    "action_type": "Palo Alto actions",
+    "content_type": "application/json",
+    "vendor_identifier": "Palo Alto",
+    "quoting": "XMLA",
+    "steps": [
+        {
+            "name": "Debug Beginning",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "Start_modify_check",
+            "comment": "Check for modify operation.",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [{"left": "${E::operation_type}", "op": "==", "right": "MODIFY"}],
+                "stop": true,
+                "else_eval": "${XC:COPY:{L:timestamp}:{E:timestamp}}"
+            }
+        },
+        {
+            "name": "Lease_check",
+            "comment": "Check for lease",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [{"left": "${E::event_type}", "op": "==", "right": "LEASE"}],
+                "next": "Sync_check_required Lease"
+            }
+        },
+        {
+            "name": "Host_add_check Ipv4",
+            "comment": "Check event type",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [{"left": "${E::event_type}", "op": "==", "right": "HOST_ADDRESS_IPV4"}],
+                "next": "Sync_check_required_Host_Ipv4"
+            }
+        },
+        {
+            "name": "FixedHost_add_check Ipv4",
+            "comment": "Check event type",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {"left": "${E::event_type}", "op": "==", "right": "FIXED_ADDRESS_IPV4"},
+                    {"left": "${E:A:values{extattrs}{PaloAlto_Asset_Sync}{value}}", "op": "==", "right": "true"}
+                ],
+                "eval": "${XC:COPY:{L:Obj_ref}:{E:values{_ref}}${XC:COPY:{L:HostIp}:{E:values{ipv4addr}}}${XC:COPY:{L:ObjName}:{E:values{ipv4addr}}}",
+                "next": "Fixed_check_action_Ipv4",
+                "else_stop": true
+            }
+        },
+
+        {
+            "name": "Network_add_check",
+            "comment": "Check event type",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {"left": "${E::event_type}", "op": "==", "right": "NETWORK_IPV4"},
+                    {"left": "${E:A:values{extattrs}{PaloAlto_Asset_Sync}{value}}", "op": "==", "right": "true"}
+                ],
+                "eval": "${XC:COPY:{L:Obj_ref}:{E:values{_ref}}${XC:COPY:{L:HostIp}:{E:values{network}}}${XC:NETWORKTORANGE:{L:HostIp}:{L:NetRange}}",
+                "next": "Fixed_check_action_Ipv4",
+                "else_stop": true
+            }
+        },
+
+        {
+          "name": "Name for Net",
+          "operation": "SERIALIZE",
+          "serializations": [
+            {"destination": "L:ObjName","content": "Network ${L:A:RangeFromNet{{from}}}"}
+          ]
+        },        
+        
+        {
+            "name": "Jump to Fixed_check_action_Ipv4",
+            "comment": "Check event type",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {"left": "${E::event_type}", "op": "==", "right": "NETWORK_IPV4"},
+                ],
+                "next": "Fixed_check_action_Ipv4"
+            }
+        },
+
+        {
+            "name": "Sync_check_required Lease",
+            "comment": "Check if event sync required",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${E:A:ip.extattrs{PaloAlto_Asset_Sync}}",
+                        "op": "!=",
+                        "right": "true"
+                    }
+                ],
+                "stop": true
+            }
+        },
+        {
+            "name": "assignLeaseIpValue",
+            "operation": "NOP",
+            "body_list": [
+                "${XC:COPY:{L:HostIp}:{E:values{address}}}${XC:COPY:{L:ObjName}:{E:values{address}}}"
+            ]
+        },
+        {
+            "name": "Lease_state_check",
+            "comment": "Check binding state",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {"left": "${E::binding_state}", "op": "!=", "right": "ACTIVE"}
+                ],
+                "next": "Check_If_Another_HostIPv4_exists",
+                "else_next": "Host_add"
+            }
+        },
+        {
+            "name": "Debug_8",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+		{
+            "name": "Fixed_check_action_Ipv4",
+            "comment": "Check operation type",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {"left": "${E::operation_type}", "op": "==", "right": "DELETE"}
+                ],
+                "next": "Check_If_Another_HostIPv4_exists",
+                "else_next": "Host_add"
+            }
+        },
+        {
+            "name": "Debug_10",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+		},
+		{
+            "name": "Sync_check_required_Host_Ipv4",
+            "comment": "Check if event sync required",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${E:A:values{extattrs}{PaloAlto_Asset_Sync}{value}}",
+                        "op": "!=",
+                        "right": "true"
+                    }
+                ],
+				"stop": true,
+				"else_eval":"${XC:COPY:{L:HostIp}:{E:values{ipv4addr}}}${XC:COPY:{L:ObjName}:{E:values{ipv4addr}}}"
+				
+            }
+		},
+
+
+        {
+            "name": "Debug_13",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "Host_check action Ipv4", 
+            "comment": "Check operation type",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${E::operation_type}",
+                        "op": "==",
+                        "right": "DELETE"
+                    }
+                ],
+                "next": "Check_If_Another_HostIPv4_exists",
+                "else_next": "Host_add"
+            }
+        },
+        {
+            "name": "Debug_14",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+		},
+        {
+            "name": "Host_add",
+            "comment": "Add an object",
+            "parse": "XMLA",
+            "operation": "GET",
+            "no_connection_debug": false,
+            "transport": {
+                "path": "?type=config&action=set&xpath=/config/shared/address/entry[@name='${L:A:ObjName}']&element=<ip-netmask>${L:A:HostIp}</ip-netmask>&key=${S::SESKEY}"
+            }
+        },
+        {
+            "name": "Debug_15",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "Host_add_group",
+            "comment": "Add an object to group",
+            "parse": "XMLA",
+            "operation": "GET",
+            "no_connection_debug": false,
+            "transport": {
+                "path": "?type=config&action=set&xpath=/config/shared/address-group/entry[@name='${S::Host_Allow}']&element=<static><member>${L:A:ObjName}</member></static>&key=${S::SESKEY}"
+            }
+        },
+        {
+            "name": "Debug_16",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "Host_add errorcheck",
+            "comment": "Check for errors",
+            "operation": "CONDITION",
+            "condition": {
+                "statements": [
+                    {
+                        "left": "success",
+                        "op": "!=",
+                        "right": "${P:A:PARSE{response}{{status}}}"
+                    }
+                ],
+                "condition_type": "AND",
+                "error": true,
+                "else_next": "commit"
+            }
+        },
+        {
+            "name": "Debug_17",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+		},
+		{
+            "name": "Check_If_Another_HostIPv4_exists",
+            "operation": "GET",
+            "transport": {
+                "path": "record:host?ipv4addr=${L:A:HostIp}&network_view=${E:A:values{network_view}}&*PaloAlto_Asset_Sync=true&*PaloAlto_Asset_SyncedAt!="
+            },
+            "wapi": "v2.7"
+		},
+		{
+            "name": "Set_value_if_no_host_is_present",
+            "comment": "Check for errors",
+            "operation": "CONDITION",
+            "condition": {
+                "statements": [
+                    {
+                        "left": "${P:A:PARSE[0]{_ref}}",
+                        "op": "==",
+                        "right": ""
+                    }
+                ],
+                "condition_type": "AND",
+				"eval": "${XC:ASSIGN:{L:NoHost}:{S:true}}",
+				"else_eval": "${XC:ASSIGN:{L:NoHost}:{S:false}}"
+            }
+		},
+		{
+            "name": "Check_If_Another_FixedIPv4_exists",
+            "operation": "GET",
+            "transport": {
+                "path": "fixedaddress?ipv4addr=${L:A:HostIp}&network_view=${E:A:values{network_view}}&*PaloAlto_Asset_Sync=true&*PaloAlto_Asset_SyncedAt!="
+            },
+            "wapi": "v2.7"
+		},
+		{
+            "name": "Stop_If_Another_Asset_Is_Present",
+            "comment": "Check for errors",
+            "operation": "CONDITION",
+            "condition": {
+                "statements": [
+                    {"left": "${P:A:PARSE[0]{_ref}}", "op": "!=", "right": ""},
+					{"left": "${L:A:NoHost}", "op": "==", "right": "false"}
+                ],
+                "condition_type": "OR",
+				"stop": true
+            }
+		},
+        {
+            "name": "Host_del_group",
+            "comment": "Delete an object to group",
+            "parse": "XMLA",
+            "operation": "GET",
+            "no_connection_debug": false,
+            "transport": {
+                "path": "?type=config&action=delete&xpath=/config/shared/address-group/entry[@name='${S::Host_Allow}']/static/member[text()='${L:A:ObjName}']&key=${S::SESKEY}"
+            }
+        },
+        {
+            "name": "Debug_18",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "Host_del_address",
+            "comment": "Delete address object",
+            "parse": "XMLA",
+            "operation": "GET",
+            "no_connection_debug": false,
+            "transport": {
+                "path": "?type=config&action=delete&xpath=/config/shared/address/entry[@name='${L:A:ObjName}']&key=${S::SESKEY}"
+            }
+        },
+        {
+            "name": "Debug_19",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "Host_del errorcheck",
+            "comment": "Check for errors",
+            "operation": "CONDITION",
+            "condition": {
+                "statements": [
+                    {
+                        "left": "success",
+                        "op": "!=",
+                        "right": "${P:A:PARSE{response}{{status}}}"
+                    }
+                ],
+                "condition_type": "AND",
+                "error": true,
+                "else_next": "commit"
+            }
+        },
+        {
+            "name": "Debug_20",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "commit",
+            "comment": "Start a commit",
+            "parse": "XMLA",
+            "operation": "GET",
+            "no_connection_debug": false,
+            "transport": {
+                "path": "?type=commit&cmd=<commit><partial><shared-object></shared-object></partial></commit>&key=${S::SESKEY}"
+            }
+        },
+        {
+            "name": "Debug_21",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "commit errorcheck",
+            "comment": "Check for errors",
+            "operation": "CONDITION",
+            "condition": {
+                "statements": [
+                    {
+                        "left": "${P:A:PARSE{response}{{status}}}",
+                        "op": "!=",
+                        "right": "success"
+                    }
+                ],
+                "condition_type": "AND",
+                "error": true
+            }
+        },
+        {
+            "name": "Debug_22",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+		},
+		{
+            "name": "If_Delete_Then_Stop",
+            "comment": "Check operation type",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${E::operation_type}",
+                        "op": "==",
+                        "right": "DELETE"
+                    }
+                ],
+                "stop": true
+            }
+        },
+        {
+            "operation": "CONDITION",
+            "name": "wapi_response_checkIf_Obj_Ref_Exists",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${L:A:Obj_ref}",
+                        "op": "!=",
+                        "right": ""
+                    }
+                ],
+                "next": "Update extattrs timestamp"
+            }
+        },
+        {
+            "name": "Debug_24",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "Get_HostIPv4_ref",
+            "operation": "GET",
+            "transport": {
+                "path": "record:host?ipv4addr=${L:A:HostIp}&network_view=${E:A:values{network_view}}&name=${E:A:values{host}}"
+            },
+            "wapi": "v2.7"
+		},
+        {
+            "name": "Debug_25",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+
+        {
+            "name": "Get_Objref",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "${P:A:PARSE[0]{_ref}}",
+                        "op": "==",
+                        "right": ""
+                    }
+				],
+				"error": true,
+                "else_eval": "${XC:COPY:{L:Obj_ref}:{P:PARSE[0]{_ref}}}"
+            }
+        },
+        {
+            "name": "Debug_27",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "Update extattrs timestamp",
+            "operation": "PUT",
+            "transport": {
+                "path": "${L:A:Obj_ref}"
+            },
+            "wapi": "v2.7",
+            "wapi_quoting": "JSON",
+            "body_list": [
+                "{\"extattrs+\":{\"PaloAlto_Asset_SyncedAt\": { \"value\": \"${L:A:timestamp}\"}}}"
+            ]
+        },
+        {
+            "name": "Debug_28",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        },
+        {
+            "name": "FinExit",
+            "comment": "Stop execution of the template.",
+            "operation": "CONDITION",
+            "condition": {
+                "condition_type": "AND",
+                "statements": [
+                    {
+                        "left": "1",
+                        "op": "==",
+                        "right": "1"
+                    }
+                ],
+                "stop": true
+            }
+        },
+        {
+            "name": "Debug_29",
+            "operation": "NOP",
+            "body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+        }
+    ]
+}
