@@ -84,7 +84,7 @@
           "name": "Name for Net",
           "operation": "SERIALIZE",
           "serializations": [
-            {"destination": "L:ObjName","content": "Network ${L:A:RangeFromNet{{from}}}"}
+            {"destination": "L:ObjName","content": "Network ${L:A:NetRange{{from}}}"}
           ]
         },        
         
