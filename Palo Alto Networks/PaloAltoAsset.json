@@ -75,7 +75,7 @@
                     {"left": "${E::event_type}", "op": "==", "right": "NETWORK_IPV4"},
                     {"left": "${E:A:values{extattrs}{PaloAlto_Asset_Sync}{value}}", "op": "==", "right": "true"}
                 ],
-                "eval": "${XC:COPY:{L:Obj_ref}:{E:values{_ref}}${XC:NETWORKTORANGE:{E:values{network}}:{L:NetRange}}",
+                "eval": "${XC:COPY:{L:Obj_ref}:{E:values{_ref}}${XC:COPY:{L:HostIp}:{E:values{network}}${XC:NETWORKTORANGE:{E:values{network}}:{L:NetRange}}",
                 "else_stop": true
             }
         },
