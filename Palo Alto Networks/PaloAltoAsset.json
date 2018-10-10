@@ -61,8 +61,7 @@
                     {"left": "${E:A:values{extattrs}{PaloAlto_Asset_Sync}{value}}", "op": "==", "right": "true"}
                 ],
                 "eval": "${XC:COPY:{L:Obj_ref}:{E:values{_ref}}${XC:COPY:{L:HostIp}:{E:values{ipv4addr}}}${XC:COPY:{L:ObjName}:{E:values{ipv4addr}}}",
-                "next": "Fixed_check_action_Ipv4",
-                "else_stop": true
+                "next": "Fixed_check_action_Ipv4"
             }
         },
 
@@ -77,7 +76,6 @@
                     {"left": "${E:A:values{extattrs}{PaloAlto_Asset_Sync}{value}}", "op": "==", "right": "true"}
                 ],
                 "eval": "${XC:COPY:{L:Obj_ref}:{E:values{_ref}}${XC:COPY:{L:HostIp}:{E:values{network}}}${XC:NETWORKTORANGE:{L:HostIp}:{L:NetRange}}",
-                "next": "Fixed_check_action_Ipv4",
                 "else_stop": true
             }
         },
