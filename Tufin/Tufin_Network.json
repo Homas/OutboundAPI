@@ -1,0 +1,189 @@
+{
+  "version": "5.0",
+  "name": "Tufin Networks",
+  "type": "REST_EVENT",
+  "vendor_identifier": "Tufin",
+  "event_type": ["NETWORK_IPV4","NETWORK_IPV6"],
+  "content_type": "application/json",
+  "steps": [
+		{
+			"name": "Debug",
+			"operation": "NOP",
+			"body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+		},
+    {
+       "operation": "CONDITION",
+       "condition": {
+          "statements": [
+            {"left": "${E:A:values{extattrs}{Tufin_Sync}{value}}", "op": "==", "right": "true"}
+          ],
+          "condition_type": "OR",
+          "eval": "${XC:COPY:{L:NetCiDR}:{E:values{network}}${XC:COPY:{L:Zone}:{E:values{extattrs}{Tufin_Zone}{value}}}${XC:COPY:{L:Zone}:{E:values{extattrs}{Tufin_Zone}{value}}}",
+          "else_stop": true
+       }
+    },
+    {
+      "operation": "CONDITION",
+      "condition": {
+          "statements": [{"left": "${E:A:values{comment}}", "op": "==", "right": ""}],
+          "condition_type": "OR",
+          "eval": "${XC:ASSIGN:{L:Comment}:{S:}}",
+          "else_eval": "${XC:COPY:{L:Comment}:{E:values{comment}}}"
+      }
+    },
+
+    {
+       "name": "skip object modification w/o zone change and comment",
+       "operation": "CONDITION",
+       "condition": {
+          "statements": [
+            {"left": "${E:A:operation_type}", "op": "==", "right": "MODIFY"},
+            {"left": "${E:A:values{extattrs}{Tufin_Zone}{value}}", "op": "==", "right": "${E:A:previous_values{extattrs}{Tufin_Zone}{value}}"},
+            {"left": "${E:A:previous_values{comment}}", "op": "==", "right": "${L:A:Comment}"}
+          ],
+          "condition_type": "AND",
+          "stop": true
+       }
+    },
+
+
+		{
+			 "operation": "VARIABLEOP",
+			 "variable_ops": [
+					{
+						 "operation": "ASSIGN",
+						 "type": "DICTIONARY",
+						 "destination": "L:SplitConfig",
+						 "keys": ["parse", "regex"],
+						 "values": ["REGEXSPLIT", "/"]
+					}
+			 ]
+		},
+
+		{
+			 "operation": "NOP",
+			 "body": "${XC:PARSE:{L:SplitConfig}:{L:NetCiDR}}"
+		},		
+
+		{
+			"operation": "NOP",
+			"body": "${XC:DEBUG:{H:}}${XC:DEBUG:{E:}}${XC:DEBUG:{I:}}${XC:DEBUG:{L:}}${XC:DEBUG:{S:}}${XC:DEBUG:{P:}}${XC:DEBUG:{R:}}${XC:DEBUG:{RH:}}${XC:DEBUG:{UT:}}"
+		},
+
+		
+    {
+       "operation": "CONDITION",
+       "condition": {
+          "statements": [
+            {"left": "${E:A:operation_type}", "op": "==", "right": "INSERT"}
+          ],
+          "condition_type": "OR",
+          "next": "new subnet",
+					"else_eval":"${XC:COPY:{L:ZoneID}:{E:values{extattrs}{Tufin_ZoneID}{value}}}" 
+       }
+    },
+
+
+	
+    {
+			"name": "get entry ID",
+			"operation": "GET",
+      "parse": "JSON",
+			"headers": {"Accept": "application/json"},
+			"transport": {
+					"path": "/securetrack/api/zones/${L:A:ZoneID}/entries?ip=${L:A:NetCiDR[0]}&prefix=${L:A:NetCiDR[1]}"
+			}
+		},
+
+
+    {
+       "name": "check update comment",
+       "operation": "CONDITION",
+       "condition": {
+          "statements": [
+            {"left": "${E:A:operation_type}", "op": "==", "right": "MODIFY"},
+            {"left": "${E:A:values{extattrs}{Tufin_Zone}{value}}", "op": "==", "right": "${E:A:previous_values{extattrs}{Tufin_Zone}{value}}"},
+            {"left": "${E:A:previous_values{comment}}", "op": "!=", "right": "${L:A:Comment}"}
+          ],
+          "condition_type": "AND",
+          "next": "update comment"
+       }
+    },
+
+		
+    {
+			"name": "delete entry",
+			"operation": "DELETE",
+			"transport": {
+					"path": "/securetrack/api/zones/${L:A:ZoneID}/entries/${P:A:zone_entries{zone_entry}{id}}"
+			},
+			"result": [{"codes":"204,200", "next":"check delete"}]
+		},
+
+		
+    {
+			"name": "update comment",
+			"operation": "PUT",
+			"transport": {
+					"path": "/securetrack/api/zones/${L:A:ZoneID}/entries/${P:A:zone_entries{zone_entry}{id}}"
+			},
+			"body_list": [                
+				"{",
+					"\"zone_entry\": {\"ip\": \"${L:A:NetCiDR[0]}\",\"prefix\": \"${L:A:NetCiDR[1]}\",\"comment\":\"${L:A:Comment}\"}",
+				"}"    
+			],
+			"result": [{"codes":"204,200", "stop":true}]
+    },		
+		
+    {
+			"name":"check delete",
+       "operation": "CONDITION",
+       "condition": {
+          "statements": [{"left": "${E:A:operation_type}", "op": "==", "right": "DELETE"}],
+          "condition_type": "OR",
+          "stop": true
+       }
+    },
+
+    {
+			"name": "new subnet",
+			"operation": "GET",
+      "parse": "JSON",
+			"headers": {"Accept": "application/json"},
+			"transport": {
+					"path": "/securetrack/api/zones?name=${L:A:Zone}"
+			}
+		},
+
+		{
+			 "operation": "NOP",
+			 "body": "${XC:COPY:{L:ZoneID}:{P:zones{zone}{id}}}"
+		},		
+
+    {
+			"name": "add entry",
+			"operation": "POST",
+			"transport": {
+					"path": "/securetrack/api/zones/${L:A:ZoneID}/entries"
+			},
+			"body_list": [                
+				"{",
+					"\"zone_entry\": {\"ip\": \"${L:A:NetCiDR[0]}\",\"prefix\": \"${L:A:NetCiDR[1]}\",\"comment\":\"${L:A:Comment}\"}",
+				"}"    
+			]
+    },
+    {
+       "name": "Update ZoneID",
+       "operation": "PUT",
+       "transport": {"path": "${E:A:values{_ref}}"},
+       "wapi": "v2.10",
+       "wapi_quoting": "JSON",
+        "body_list": [
+            "{",
+            "\"extattrs+\":{\"Tufin_ZoneID\": { \"value\": \"${L:A:ZoneID}\"}, \"Tufin_SyncTime\": { \"value\": \"${UT:U:TIME}\"}}",
+            "}"
+        ]
+
+    }
+  ]
+}

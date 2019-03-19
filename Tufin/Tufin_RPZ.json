@@ -1,0 +1,47 @@
+{
+  "version": "5.0",
+  "name": "Tufin RPZ",
+  "type": "REST_EVENT",
+  "vendor_identifier": "Tufin",
+  "event_type": ["RPZ"],
+  "content_type": "application/json",
+  "steps": [
+    {
+			"name": "postsomething",
+			"operation": "POST",
+			"transport": {
+					"path": "/securechangeworkflow/api/securechange/tickets"
+			},
+			"body_list": [                
+				"{",
+				"\"ticket\": {",
+					"\"subject\": \"API WebApp\", \"requester\": \"api\", \"priority\": \"Normal\", \"domain_name\": \"Default\", \"workflow\": { \"name\": \"Close Policy\" },",
+					"\"steps\": {",
+							"\"step\": [",
+									"{ \"name\": \"Create request\",",
+											"\"tasks\": {",
+													"\"task\": {",
+															"\"fields\": {",
+																	"\"field\": [",
+																			"{ \"@xsi.type\": \"multi_access_request\", \"name\": \"Flows\", \"access_request\":{",
+																					"\"targets\": { \"target\": { \"@type\": \"ANY\" } },",
+																					"\"sources\": { \"source\": [ { \"@type\": \"IP\", \"ip_address\":${E::source_ip}, \"netmask\": \"255.255.255.255\" } ] },",
+																					"\"destinations\": { \"destination\": [ { \"@type\": \"ANY\" } ] },",
+																					"\"services\": { \"service\": [ { \"@type\": \"ANY\" } ] },",
+																					"\"action\": \"Drop\", \"comment\": \"Infoblox DNS Firewall Event. Request: ${E:A:query_name}\",",
+																					"\"labels\": \"\"",
+																				"} },",
+																			"{ \"@xsi.type\": \"text_area\", \"name\": \"Reason\", \"text\": \"Infoblox DNS Firewall Event. Request: ${E:A:query_name}\" }",
+																	"]",
+															"}",
+													"}",
+											"}",
+									"}",
+								"]",
+						"}",
+					"}",
+				"}"    
+			]
+    }
+  ]
+}
